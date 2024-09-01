@@ -1,0 +1,22 @@
+main: net.noisivelet.cenikito.cenikitopvp.SpigotPlugin
+name: CenikitoPvP
+version: 1.0
+description: PvP para el servidor
+author: Noisivelet
+website: francisnet.es
+prefix: cpvp
+api-version: 1.20
+depend: [ProtocolLib]
+commands:
+    heavenpick:
+        description: Obtiene un pico de los cielos (DEBUG)
+        usage: /<command>
+        permission: cenikitopvp.debugpick
+    evento:
+        description: Cambia el evento activo
+        usage: /<command>
+        permission: cenikitopvp.changeevent
+    vidas:
+        description: Cambia las vidas de alguien
+        usage: /<command>
+        permission: cenikitopvp.vidas.change
