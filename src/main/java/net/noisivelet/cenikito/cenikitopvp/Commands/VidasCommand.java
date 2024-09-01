@@ -4,7 +4,12 @@
  */
 package net.noisivelet.cenikito.cenikitopvp.Commands;
 
+import java.sql.SQLException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import net.noisivelet.cenikito.cenikitopvp.SpigotPlugin;
+import static net.noisivelet.cenikito.cenikitopvp.SpigotPlugin.USERS;
+import net.noisivelet.cenikito.cenikitopvp.utils.UserDatabase.PlayerData;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -23,7 +28,15 @@ public class VidasCommand implements CommandExecutor{
         
         Player p = Bukkit.getPlayer(strings[0]);
         int nuevasVidas = Integer.valueOf(strings[1]);
-        SpigotPlugin.vidas.put(p.getUniqueId(), nuevasVidas);
+        PlayerData data;
+        try {
+            data = USERS.get(p.getUniqueId());
+        } catch (SQLException ex) {
+            Logger.getLogger(VidasCommand.class.getName()).log(Level.SEVERE, null, ex);
+            cs.sendMessage("SQLException");
+            return true;
+        }
+        data.setVidas(nuevasVidas);
         SpigotPlugin.pvp.getObjective("vidas").getScore(p).setScore(nuevasVidas*2);
         cs.sendMessage("OK");
         return true;

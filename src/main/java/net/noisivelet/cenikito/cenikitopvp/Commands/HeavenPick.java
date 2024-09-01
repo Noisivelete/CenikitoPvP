@@ -2,7 +2,7 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
-package net.noisivelet.cenikito.cenikitopvp;
+package net.noisivelet.cenikito.cenikitopvp.Commands;
 
 import java.util.List;
 import java.util.UUID;
@@ -37,7 +37,7 @@ import org.bukkit.plugin.Plugin;
  *
  * @author Francis
  */
-public class TestCommands implements CommandExecutor{
+public class HeavenPick implements CommandExecutor{
 
     @Override
     public boolean onCommand(CommandSender cs, Command cmnd, String string, String[] strings) {

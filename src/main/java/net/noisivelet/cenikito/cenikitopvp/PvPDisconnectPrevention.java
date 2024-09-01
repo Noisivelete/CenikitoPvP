@@ -4,8 +4,10 @@
  */
 package net.noisivelet.cenikito.cenikitopvp;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -14,10 +16,17 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
-import static net.noisivelet.cenikito.cenikitopvp.SpigotPlugin.vidas;
+import static net.noisivelet.cenikito.cenikitopvp.SpigotPlugin.CONFIG;
+import static net.noisivelet.cenikito.cenikitopvp.SpigotPlugin.USERS;
+import static net.noisivelet.cenikito.cenikitopvp.SpigotPlugin.mercyRule;
+import net.noisivelet.cenikito.cenikitopvp.utils.PluginConfig;
+import net.noisivelet.cenikito.cenikitopvp.utils.UserDatabase.PlayerData;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.AreaEffectCloud;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
@@ -33,6 +42,11 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
+import org.bukkit.persistence.PersistentDataContainer;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.projectiles.ProjectileSource;
@@ -45,7 +59,6 @@ import org.bukkit.scheduler.BukkitTask;
 public class PvPDisconnectPrevention implements Listener {
 
     ConcurrentHashMap<UUID, Long> inCombat = new ConcurrentHashMap<>();
-    ConcurrentHashMap<UUID, BukkitTask> mercyRule = new ConcurrentHashMap<>();
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
@@ -104,6 +117,18 @@ public class PvPDisconnectPrevention implements Listener {
         Entity damager = event.getDamageSource().getCausingEntity();
         if(damager == null || !(damager instanceof Player)) return;
         
+        boolean pvpActive = true;
+        try {
+            pvpActive = CONFIG.get(PluginConfig.Key.IS_PVP_ENABLED).equals("1");
+        } catch (SQLException ex) {
+            Logger.getLogger(PvPDisconnectPrevention.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        
+        if(!pvpActive){
+            event.setCancelled(true);
+            damager.sendMessage(ChatColor.GOLD+"[*] "+ChatColor.YELLOW+"PvP está desactivado.");
+        }
+        
         
         if(mercyRule.containsKey(defender.getUniqueId())){
             event.setCancelled(true);
@@ -114,6 +139,14 @@ public class PvPDisconnectPrevention implements Listener {
         if(mercyRule.containsKey(damager.getUniqueId())){
             mercyRule.remove(damager.getUniqueId()).cancel();
             damager.sendMessage(ChatColor.DARK_RED+"[*] "+ChatColor.RED+"Has cancelado tu regla de clemencia al atacar a un jugador.");
+            PlayerData data;
+            try {
+                data = USERS.get(damager.getUniqueId());
+            } catch (SQLException ex) {
+                Logger.getLogger(PvPDisconnectPrevention.class.getName()).log(Level.SEVERE, null, ex);
+                return;
+            }
+            data.setMercyRuleUntil(0);
         }
 
         startCombat((Player)damager, (Player)defender);
@@ -143,18 +176,37 @@ public class PvPDisconnectPrevention implements Listener {
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent event){
         Player p = event.getEntity();
-        if(!vidas.containsKey(p.getUniqueId())){
-            vidas.put(p.getUniqueId(), 10);
+        PlayerData pdata;
+        try {
+            pdata = USERS.get(p.getUniqueId());
+        } catch (SQLException ex) {
+            Logger.getLogger(PvPDisconnectPrevention.class.getName()).log(Level.SEVERE, null, ex);
+            return;
         }
-        int vidasRestantes = vidas.get(p.getUniqueId());
+        int vidasRestantes = pdata.getVidas();
         if(vidasRestantes == 1){
-            vidas.put(p.getUniqueId(), 0);
+            pdata.setVidas(0);
             p.setGameMode(GameMode.SPECTATOR);
             SpigotPlugin.sendAlert(""+ChatColor.DARK_PURPLE+ChatColor.BOLD+"¡"+ChatColor.DARK_RED+ChatColor.BOLD+p.getName()+ChatColor.DARK_PURPLE+ChatColor.BOLD+" ha sido eliminado!");
         } else
-            vidas.put(p.getUniqueId(), vidas.get(p.getUniqueId())-1);
+            pdata.setVidas(vidasRestantes - 1);
         
         if(inCombat.containsKey(p.getUniqueId())){
+            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+            SkullMeta meta = (SkullMeta)head.getItemMeta();
+            
+            meta.setOwningPlayer(p);
+            meta.setDisplayName(ChatColor.YELLOW+"Cabeza de "+ChatColor.AQUA+p.getName());
+            meta.setLore(List.of(
+                    ChatColor.LIGHT_PURPLE+"Hacer click derecho en esta cabeza la consumirá, curándote 5 corazones instantáneamente."
+            ));
+            PersistentDataContainer data = meta.getPersistentDataContainer();
+            
+            NamespacedKey nk = new NamespacedKey("cenikitopvp", "playerhead");
+            data.set(nk, PersistentDataType.BOOLEAN, true);
+            head.setItemMeta(meta);
+            event.getEntity().getWorld().dropItem(event.getEntity().getLocation(), head);
+            
             Entity killer = event.getDamageSource().getCausingEntity();
             
             if(killer instanceof Player k){
@@ -190,7 +242,7 @@ public class PvPDisconnectPrevention implements Listener {
             } else {
                 p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.GREEN+"⚔ --:--:---"));
                 inCombat.remove(p.getUniqueId());
-                SpigotPlugin.pvp.getTeam("pvp").addPlayer(p);
+                SpigotPlugin.addToPvPTeam(p);
                 p.sendMessage(ChatColor.DARK_GREEN+"[*] "+ChatColor.GREEN+"Has dejado de estar en combate. Puedes desconectarte.");
             }
         }
@@ -198,14 +250,14 @@ public class PvPDisconnectPrevention implements Listener {
     
     public void startCombat(Player damager, Player defender){
         if (!inCombat.containsKey(damager.getUniqueId())) {
-            SpigotPlugin.pvp.getTeam("combat").addPlayer(damager);
+            SpigotPlugin.addToCombatTeam(damager);
             ((Player) damager).sendMessage("" + ChatColor.DARK_RED + ChatColor.BOLD + "[*] " + ChatColor.RED + ChatColor.BOLD + "Has iniciado un combate contra " + ChatColor.YELLOW + ChatColor.BOLD + defender.getName() + ChatColor.RED + ChatColor.BOLD + ". No te desconectes.");
             final Player damagerfinal=(Player)damager;
             Bukkit.getScheduler().runTaskAsynchronously(SpigotPlugin.plugin, ()->{combatTask((Player)damagerfinal);});
         }
 
         if (!inCombat.containsKey(defender.getUniqueId())) {
-            SpigotPlugin.pvp.getTeam("combat").addPlayer(defender);
+            SpigotPlugin.addToCombatTeam(defender);
             ((Player) defender).sendMessage("" + ChatColor.DARK_RED + ChatColor.BOLD + "[*] " + ChatColor.RED + ChatColor.BOLD + "ESTÁS EN COMBATE CONTRA " + ChatColor.YELLOW + ChatColor.BOLD + damager.getName() + ChatColor.RED + ChatColor.BOLD + ". NO TE DESCONECTES.");
             Bukkit.getScheduler().runTaskAsynchronously(SpigotPlugin.plugin, ()->{combatTask((Player)defender);});
         }
@@ -216,19 +268,31 @@ public class PvPDisconnectPrevention implements Listener {
         inCombat.put(defender.getUniqueId(), expiry);
     }
     
-    public void removeMercyRuleTask(Player p){
+    public static void removeMercyRuleTask(Player p){
         mercyRule.remove(p.getUniqueId());
-        SpigotPlugin.pvp.getTeam("pvp").addPlayer(p);
-        p.setDisplayName(ChatColor.RED+"🗡 "+p.getName());
+        SpigotPlugin.addToPvPTeam(p);
         p.sendMessage(ChatColor.GOLD+"[*] "+ChatColor.YELLOW+"Tu regla de clemencia ha finalizado. Puedes volver a ser atacado/a.");
+        PlayerData data;
+        try {
+            data = USERS.get(p.getUniqueId());
+        } catch (SQLException ex) {
+            Logger.getLogger(PvPDisconnectPrevention.class.getName()).log(Level.SEVERE, null, ex);
+            return;
+        }
+        data.setMercyRuleUntil(0);
     }
     
-    public void addToMercyRule(Player p){
-        SpigotPlugin.pvp.getTeam("safe").addPlayer(p);
-        p.setDisplayName(ChatColor.YELLOW+"🏳 "+p.getName());
-        BukkitTask task = Bukkit.getScheduler().runTaskLater(SpigotPlugin.plugin, ()->{removeMercyRuleTask(p);}, 15*60*20);
+    public static void addToMercyRule(Player p){
+        addToMercyRule(p, System.currentTimeMillis()+15*60*1000);
+    }
+    
+    public static void addToMercyRule(Player p, long until){
+        SpigotPlugin.addToSafeTeam(p);
+        long remaining = until - System.currentTimeMillis();
+        long remainingTicks = (remaining / 1000) * 20;
+        BukkitTask task = Bukkit.getScheduler().runTaskLater(SpigotPlugin.plugin, ()->{removeMercyRuleTask(p);}, remainingTicks);
         mercyRule.put(p.getUniqueId(), task);
         p.sendMessage(ChatColor.GOLD+"[*] "+ChatColor.YELLOW+"Se ha activado la regla de clemencia: Eres inmune al daño de otros jugadores durante los siguientes 15 minutos, o hasta que ataques a alguno.");
-        
+
     }
 }

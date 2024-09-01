@@ -2,8 +2,9 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
-package net.noisivelet.cenikito.cenikitopvp;
+package net.noisivelet.cenikito.cenikitopvp.Commands;
 
+import net.noisivelet.cenikito.cenikitopvp.Sidebar;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -23,8 +24,9 @@ public class SidebarEditCommands implements CommandExecutor{
         }
         
         Sidebar.setNextEventTime(Long.parseLong(strings[0]));
+        Sidebar.setNextEventPayload(strings[1]);
         String nombre = "";
-        for(int i = 1; i<strings.length;i++){
+        for(int i = 2; i<strings.length;i++){
             String str = strings[i];
             nombre+=str+" ";
         }

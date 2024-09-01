@@ -4,10 +4,14 @@
  */
 package net.noisivelet.cenikito.cenikitopvp;
 
+import net.noisivelet.cenikito.cenikitopvp.Commands.SidebarEditCommands;
+import net.noisivelet.cenikito.cenikitopvp.Commands.HeavenPick;
 import com.comphenix.protocol.PacketType;
 import com.comphenix.protocol.ProtocolLibrary;
 import com.comphenix.protocol.events.PacketAdapter;
 import com.comphenix.protocol.events.PacketEvent;
+import java.io.IOException;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,10 +25,16 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.noisivelet.cenikito.cenikitopvp.Commands.VidasCommand;
 import net.noisivelet.cenikito.cenikitopvp.packets.WrapperPlayServerLogin;
+import net.noisivelet.cenikito.cenikitopvp.utils.PluginConfig;
+import net.noisivelet.cenikito.cenikitopvp.utils.SQLDatabase;
+import net.noisivelet.cenikito.cenikitopvp.utils.UserDatabase;
+import net.noisivelet.cenikito.cenikitopvp.utils.UserDatabase.PlayerData;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
@@ -62,6 +72,7 @@ import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.Criteria;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
@@ -77,17 +88,27 @@ import org.bukkit.scoreboard.Team;
  */
 public class SpigotPlugin extends JavaPlugin implements Listener{
     public static Scoreboard pvp;
-    public static ConcurrentHashMap<UUID, Integer> vidas = new ConcurrentHashMap<>();
     
     public static Plugin plugin;
+    public static PluginConfig CONFIG = new PluginConfig();
+    public static UserDatabase USERS = new UserDatabase();
+    
+    public static ConcurrentHashMap<UUID, BukkitTask> mercyRule = new ConcurrentHashMap<>();
     
     @Override
     public void onEnable() {
         plugin = this;
+        try {
+            SQLDatabase.start();
+        } catch (SQLException | IOException ex) {
+            Logger.getLogger(SpigotPlugin.class.getName()).log(Level.SEVERE, null, ex);
+            this.setEnabled(false);
+            return;
+        }
         Bukkit.getPluginManager().registerEvents(this,this);
         Bukkit.getPluginManager().registerEvents(new PvPDisconnectPrevention(), this);
         Bukkit.getPluginManager().registerEvents(new WitherModifier(), this);
-        this.getCommand("heavenpick").setExecutor(new TestCommands());
+        this.getCommand("heavenpick").setExecutor(new HeavenPick());
         this.getCommand("evento").setExecutor(new SidebarEditCommands());
         this.getCommand("vidas").setExecutor(new VidasCommand());
         
@@ -141,10 +162,33 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         /*event.getPlayer().setMaxHealth(2);
         event.getPlayer().sendMessage("[*] Setting HP to 2");*/
         p.setScoreboard(pvp);
-        int vidasJugador = vidas.getOrDefault(p.getUniqueId(), 10);
-        pvp.getTeam("pvp").addPlayer(event.getPlayer());
+        
+        boolean pvpEnabled = true;
+        try {
+            pvpEnabled = CONFIG.get(PluginConfig.Key.IS_PVP_ENABLED).equals("1");
+        } catch (SQLException ex) {
+            Logger.getLogger(SpigotPlugin.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        
+        PlayerData data;
+        try {
+            data = USERS.get(p.getUniqueId());
+        } catch (SQLException ex) {
+            Logger.getLogger(SpigotPlugin.class.getName()).log(Level.SEVERE, null, ex);
+            return;
+        }
+        int vidasJugador = data.getVidas();
+        long mercyRulePlayer = data.getMercyRuleUntil();
+        if(!mercyRule.containsKey(p.getUniqueId()) && mercyRulePlayer != 0){
+            PvPDisconnectPrevention.addToMercyRule(p, mercyRulePlayer);
+        }
+        
+        if(pvpEnabled){
+            addToPvPTeam(p);
+        } else{
+            addToSafeTeam(p);
+        }
         pvp.getObjective("vidas").getScore(event.getPlayer()).setScore(vidasJugador * 2);
-        p.setDisplayName(ChatColor.RED+"🗡 "+event.getPlayer().getName());
         if(vidasJugador == 0)
             p.setGameMode(GameMode.SPECTATOR);
     }
@@ -158,15 +202,32 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         ItemStack handStack = event.getItem();
         if(handStack == null) return;
         Material hand = handStack.getType();
-        if(hand == Material.ENDER_EYE){
-            event.setCancelled(true);
-            event.getPlayer().sendMessage(ChatColor.DARK_RED+"[*] "+ChatColor.RED+"Imposible acceder al End hasta que el evento del End haya sido completado - próximamente.");
+        if(hand != Material.ENDER_EYE) return;
+        
+        boolean endActive = true;
+        try {
+            endActive = CONFIG.get(PluginConfig.Key.IS_END_ENABLED).equals("1");
+        } catch (SQLException ex) {
+            Logger.getLogger(SpigotPlugin.class.getName()).log(Level.SEVERE, null, ex);
         }
+        
+        if(endActive) return;
+        
+        event.setCancelled(true);
+        event.getPlayer().sendMessage(ChatColor.DARK_RED+"[*] "+ChatColor.RED+"Imposible acceder al End hasta que el evento del End haya sido completado - próximamente.");
     }
     
     @EventHandler
     public void onPortalCreateEvent(PortalCreateEvent event){
         if(event.getReason() != CreateReason.FIRE) return;
+        boolean nether = true;
+        try {
+            nether = CONFIG.get(PluginConfig.Key.IS_NETHER_ENABLED).equals("1");
+        } catch (SQLException ex) {
+            Logger.getLogger(SpigotPlugin.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        if(nether) return;
+        
         event.setCancelled(true);
         Entity entity = event.getEntity();
         if(entity.getType() != EntityType.PLAYER) return;
@@ -308,6 +369,9 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
                 if(restante > 0)
                     str=restante+"d "+str;
         }
+        if(str.isEmpty()){
+            str = "<1m";
+        }
         return str;
     }
     
@@ -348,4 +412,18 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         }
     }
     
+    public static void addToSafeTeam(Player p){
+        SpigotPlugin.pvp.getTeam("safe").addPlayer(p);
+        p.setDisplayName(ChatColor.YELLOW+"🏳 "+p.getName());
+    }
+    
+    public static void addToPvPTeam(Player p){
+        SpigotPlugin.pvp.getTeam("pvp").addPlayer(p);
+        p.setDisplayName(ChatColor.RED+"🗡 "+p.getName());
+    }
+    
+    public static void addToCombatTeam(Player p){
+        SpigotPlugin.pvp.getTeam("combat").addPlayer(p);
+        p.setDisplayName(ChatColor.DARK_RED+"⚔ "+p.getName());
+    }
 }
