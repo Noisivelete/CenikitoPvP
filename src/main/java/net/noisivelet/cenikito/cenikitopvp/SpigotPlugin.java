@@ -186,7 +186,7 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         
         ShapedRecipe recipe = new ShapedRecipe(nk, PotionOfHeightenedSenses.getPotion());
         
-        recipe.shape("HHH"," P "," S ");
+        recipe.shape("H H"," P "," S ");
         
         recipe.setIngredient('H', Material.PLAYER_HEAD);
         recipe.setIngredient('P', Material.DRAGON_BREATH);

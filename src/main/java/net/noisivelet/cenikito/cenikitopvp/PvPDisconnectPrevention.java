@@ -18,6 +18,7 @@ import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import static net.noisivelet.cenikito.cenikitopvp.SpigotPlugin.CONFIG;
 import static net.noisivelet.cenikito.cenikitopvp.SpigotPlugin.USERS;
+import static net.noisivelet.cenikito.cenikitopvp.SpigotPlugin.getHead;
 import static net.noisivelet.cenikito.cenikitopvp.SpigotPlugin.mercyRule;
 import net.noisivelet.cenikito.cenikitopvp.utils.PluginConfig;
 import net.noisivelet.cenikito.cenikitopvp.utils.UserDatabase.PlayerData;
@@ -67,6 +68,7 @@ public class PvPDisconnectPrevention implements Listener {
         Long combatExpiration = inCombat.remove(uuid);
         if (combatExpiration != null && combatExpiration > now) {
             event.getPlayer().setHealth(0); //Matarlo
+            event.getPlayer().getWorld().dropItem(event.getPlayer().getLocation(), getHead(event.getPlayer()));
         }
     }
     
