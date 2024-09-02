@@ -206,7 +206,6 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event){
         Player p = event.getPlayer();
-        sendAlert("TEST ALERT: "+ChatColor.DARK_PURPLE+ChatColor.BOLD+"TEST WITH COLOR");
         /*event.getPlayer().setMaxHealth(2);
         event.getPlayer().sendMessage("[*] Setting HP to 2");*/
         p.setScoreboard(pvp);
@@ -720,7 +719,7 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
             return;
         }
         
-        if(data.isHeightenedSenses())
+        if(data.isHeightenedSenses() && data.isHearingHeartbeats())
             player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(warningColor+"⚠ "+alerta));
         
         if(playSound && data.isHearingHeartbeats()){
