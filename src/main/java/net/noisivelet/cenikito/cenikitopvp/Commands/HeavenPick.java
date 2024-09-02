@@ -9,6 +9,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
+import net.noisivelet.cenikito.cenikitopvp.SpigotPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -47,41 +48,13 @@ public class HeavenPick implements CommandExecutor{
         }
         
         if(cs instanceof Player player){
-            ItemStack pick = new ItemStack(Material.NETHERITE_PICKAXE);
-            pick.addUnsafeEnchantment(Enchantment.FORTUNE, 15);
-            pick.addUnsafeEnchantment(Enchantment.EFFICIENCY, 10);
-            Repairable im = (Repairable)pick.getItemMeta();
-            im.addItemFlags(ItemFlag.HIDE_ADDITIONAL_TOOLTIP, ItemFlag.HIDE_ENCHANTS, ItemFlag.HIDE_ATTRIBUTES);
-            im.addAttributeModifier(Attribute.GENERIC_ATTACK_DAMAGE, new AttributeModifier(NamespacedKey.fromString("generic.attack_damage"), 1, Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND));
-            im.addAttributeModifier(Attribute.GENERIC_ATTACK_SPEED, new AttributeModifier(NamespacedKey.fromString("generic.attack_speed"), 1, Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND));
-
-            im.setDisplayName(""+ChatColor.DARK_PURPLE+ChatColor.BOLD+"Regalo de los cielos");
-            im.setLore(
-                    List.of(
-                            ChatColor.GRAY+"Eficiencia X",
-                            ChatColor.GRAY+"Fortuna XV",
-                            ChatColor.LIGHT_PURPLE+"Una vez cada 2 horas, los dioses te brindan su ayuda,",
-                            ChatColor.LIGHT_PURPLE+"para evitar que te quedes rezagado/a.",
-                            ""+ChatColor.WHITE,
-                            ""+ChatColor.DARK_AQUA+ChatColor.BOLD+"[Ligado]",
-                            ""+ChatColor.AQUA+ChatColor.ITALIC+"Solo puede ser cogido del suelo y usado por ti.",
-                            ""+ChatColor.AQUA+ChatColor.ITALIC+"Indestructible mientras esté en el suelo."
-                            
-                    )
-            );
-            im.setRarity(ItemRarity.EPIC);
-            im.setRepairCost(999);
-            PersistentDataContainer pdc = im.getPersistentDataContainer();
-            NamespacedKey key = new NamespacedKey("cenikitopvp", "owner");
-            if(strings.length != 0)
-                pdc.set(key, PersistentDataType.STRING, UUID.randomUUID().toString());
+            ItemStack heavenPick;
+            if(strings.length == 0)
+                heavenPick = SpigotPlugin.getHeavenPick(player.getUniqueId());
             else
-                pdc.set(key, PersistentDataType.STRING, player.getUniqueId().toString());
-            pick.setItemMeta(im);
-            pick.setDurability((short)3000);
-            player.getInventory().addItem(pick);
+                heavenPick = SpigotPlugin.getHeavenPick(UUID.randomUUID());
             
-            
+            player.getInventory().addItem(heavenPick);
             player.sendMessage("OK");
             return true;
         } else {

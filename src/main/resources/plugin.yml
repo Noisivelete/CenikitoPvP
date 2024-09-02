@@ -20,3 +20,14 @@ commands:
         description: Cambia las vidas de alguien
         usage: /<command>
         permission: cenikitopvp.vidas.change
+    head:
+        description: Coge la cabeza de alguien
+        usage: /<command>
+        permission: cenikitopvp.head
+    distancia:
+        description: Revisa la distancia total hasta la persona mas cercana
+        usage: /<command>
+        permission: cenikitopvp.checkdistancia
+    latidos:
+        description: Cambia si oirás o no latidos cuando haya gente cerca tuya
+        usage: /<command>

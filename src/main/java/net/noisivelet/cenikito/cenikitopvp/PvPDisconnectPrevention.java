@@ -58,7 +58,7 @@ import org.bukkit.scheduler.BukkitTask;
  */
 public class PvPDisconnectPrevention implements Listener {
 
-    ConcurrentHashMap<UUID, Long> inCombat = new ConcurrentHashMap<>();
+    public static ConcurrentHashMap<UUID, Long> inCombat = new ConcurrentHashMap<>();
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
@@ -127,6 +127,7 @@ public class PvPDisconnectPrevention implements Listener {
         if(!pvpActive){
             event.setCancelled(true);
             damager.sendMessage(ChatColor.GOLD+"[*] "+ChatColor.YELLOW+"PvP está desactivado.");
+            return;
         }
         
         
@@ -192,19 +193,7 @@ public class PvPDisconnectPrevention implements Listener {
             pdata.setVidas(vidasRestantes - 1);
         
         if(inCombat.containsKey(p.getUniqueId())){
-            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
-            SkullMeta meta = (SkullMeta)head.getItemMeta();
-            
-            meta.setOwningPlayer(p);
-            meta.setDisplayName(ChatColor.YELLOW+"Cabeza de "+ChatColor.AQUA+p.getName());
-            meta.setLore(List.of(
-                    ChatColor.LIGHT_PURPLE+"Hacer click derecho en esta cabeza la consumirá, curándote 5 corazones instantáneamente."
-            ));
-            PersistentDataContainer data = meta.getPersistentDataContainer();
-            
-            NamespacedKey nk = new NamespacedKey("cenikitopvp", "playerhead");
-            data.set(nk, PersistentDataType.BOOLEAN, true);
-            head.setItemMeta(meta);
+            ItemStack head = SpigotPlugin.getHead(event.getEntity());
             event.getEntity().getWorld().dropItem(event.getEntity().getLocation(), head);
             
             Entity killer = event.getDamageSource().getCausingEntity();

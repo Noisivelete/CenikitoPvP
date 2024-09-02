@@ -22,12 +22,16 @@ public class UserDatabase {
         private boolean creadoEnderChest;
         private int vidas;
         private long mercyRuleUntil;
+        private boolean heightenedSenses;
+        private boolean hearingHeartbeats;
 
-        public PlayerData(UUID uuid, boolean creadoEnderChest, int vidas, long mercyRuleUntil) {
+        public PlayerData(UUID uuid, boolean creadoEnderChest, int vidas, long mercyRuleUntil, boolean heightenedSenses, boolean hearingHeartbeats) {
             this.uuid = uuid;
             this.creadoEnderChest = creadoEnderChest;
             this.vidas = vidas;
             this.mercyRuleUntil = mercyRuleUntil;
+            this.heightenedSenses = heightenedSenses;
+            this.hearingHeartbeats = hearingHeartbeats;
         }
         
         public PlayerData(UUID uuid){
@@ -88,6 +92,34 @@ public class UserDatabase {
                 Logger.getLogger(UserDatabase.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
+
+        public boolean isHeightenedSenses() {
+            return heightenedSenses;
+        }
+
+        public void setHeightenedSenses(boolean heightenedSenses) {
+            this.heightenedSenses = heightenedSenses;
+            try {
+                SQLDatabase.queryDML("UPDATE jugadores SET heightened_senses=? WHERE uuid=?", heightenedSenses?"1":"0", uuid.toString());
+            } catch (SQLException ex) {
+                Logger.getLogger(UserDatabase.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+
+        public boolean isHearingHeartbeats() {
+            return hearingHeartbeats;
+        }
+
+        public void setHearingHeartbeats(boolean hearingHeartbeats) {
+            this.hearingHeartbeats = hearingHeartbeats;
+            try {
+                SQLDatabase.queryDML("UPDATE jugadores SET hearing_heartbeats=? WHERE uuid=?", hearingHeartbeats?"1":"0", uuid.toString());
+            } catch (SQLException ex) {
+                Logger.getLogger(UserDatabase.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+        
+        
     }
     
     ConcurrentHashMap<UUID,PlayerData> cache;
@@ -102,7 +134,7 @@ public class UserDatabase {
                     cache.put(key, new PlayerData(key));
                 else{
                     HashMap<String,String> row = query.get(0);
-                    cache.put(key, new PlayerData(UUID.fromString(row.get("uuid")), row.get("creado_ender_chest").equals("1"), Integer.parseInt(row.get("vidas")), Long.parseLong(row.get("mercy_rule_until"))));
+                    cache.put(key, new PlayerData(UUID.fromString(row.get("uuid")), row.get("creado_ender_chest").equals("1"), Integer.parseInt(row.get("vidas")), Long.parseLong(row.get("mercy_rule_until")), row.get("heightened_senses").equals("1"), row.get("hearing_heartbeats").equals("1")));
                 }
             }
             

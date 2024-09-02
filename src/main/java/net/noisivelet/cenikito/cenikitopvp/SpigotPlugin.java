@@ -29,7 +29,11 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
+import net.noisivelet.cenikito.cenikitopvp.Commands.CheckClosestDistance;
+import net.noisivelet.cenikito.cenikitopvp.Commands.GetPlayerHead;
+import net.noisivelet.cenikito.cenikitopvp.Commands.SwitchHeartbeats;
 import net.noisivelet.cenikito.cenikitopvp.Commands.VidasCommand;
+import static net.noisivelet.cenikito.cenikitopvp.PvPDisconnectPrevention.inCombat;
 import net.noisivelet.cenikito.cenikitopvp.packets.WrapperPlayServerLogin;
 import net.noisivelet.cenikito.cenikitopvp.utils.PluginConfig;
 import net.noisivelet.cenikito.cenikitopvp.utils.SQLDatabase;
@@ -38,10 +42,17 @@ import net.noisivelet.cenikito.cenikitopvp.utils.UserDatabase.PlayerData;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Sound;
+import org.bukkit.SoundCategory;
+import org.bukkit.World;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.block.Block;
 import org.bukkit.damage.DamageType;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Item;
@@ -52,26 +63,43 @@ import org.bukkit.event.EventPriority;
 import static org.bukkit.event.EventPriority.LOWEST;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import static org.bukkit.event.block.Action.LEFT_CLICK_AIR;
+import static org.bukkit.event.block.Action.LEFT_CLICK_BLOCK;
+import static org.bukkit.event.block.Action.PHYSICAL;
+import static org.bukkit.event.block.Action.RIGHT_CLICK_AIR;
+import static org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.enchantment.PrepareItemEnchantEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.hanging.HangingBreakByEntityEvent;
 import org.bukkit.event.inventory.InventoryPickupItemEvent;
+import org.bukkit.event.inventory.PrepareGrindstoneEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.PortalCreateEvent;
 import org.bukkit.event.world.PortalCreateEvent.CreateReason;
+import org.bukkit.inventory.EquipmentSlotGroup;
+import org.bukkit.inventory.ItemFlag;
+import org.bukkit.inventory.ItemRarity;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.RecipeChoice;
+import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.Repairable;
+import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.Criteria;
 import org.bukkit.scoreboard.DisplaySlot;
@@ -108,9 +136,13 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         Bukkit.getPluginManager().registerEvents(this,this);
         Bukkit.getPluginManager().registerEvents(new PvPDisconnectPrevention(), this);
         Bukkit.getPluginManager().registerEvents(new WitherModifier(), this);
+        Bukkit.getPluginManager().registerEvents(new PotionOfHeightenedSenses(), this);
         this.getCommand("heavenpick").setExecutor(new HeavenPick());
         this.getCommand("evento").setExecutor(new SidebarEditCommands());
         this.getCommand("vidas").setExecutor(new VidasCommand());
+        this.getCommand("head").setExecutor(new GetPlayerHead());
+        this.getCommand("distancia").setExecutor(new CheckClosestDistance());
+        this.getCommand("latidos").setExecutor(new SwitchHeartbeats());
         
         ProtocolLibrary.getProtocolManager().addPacketListener(
                 new PacketAdapter(this, PacketType.Play.Server.LOGIN) {
@@ -149,10 +181,25 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         Objective sidebar = pvp.registerNewObjective("sidebar", Criteria.DUMMY, "CenikitoPvP");
         sidebar.setDisplaySlot(DisplaySlot.SIDEBAR);
         
+        NamespacedKey nk = new NamespacedKey("cenikitopvp", "heightened_senses_potion");
+        
+        ShapedRecipe recipe = new ShapedRecipe(nk, PotionOfHeightenedSenses.getPotion());
+        
+        recipe.shape("HHH"," P "," S ");
+        
+        recipe.setIngredient('H', Material.PLAYER_HEAD);
+        recipe.setIngredient('P', Material.DRAGON_BREATH);
+        recipe.setIngredient('S', Material.CALIBRATED_SCULK_SENSOR);
+        Bukkit.addRecipe(recipe);
+        
         Bukkit.getScheduler().runTaskTimer(this, ()->{
             Sidebar.updateSidebar();
         }, 0, 20*60);
         
+        Bukkit.getScheduler().runTaskTimer(this, ()->{
+            heavenlyPickaxeTask();
+        }, 60*60*2*20, 60*60*2*20); //Cada 2 horas
+        //}, 20*20, 60*20);
     }
     
     @EventHandler
@@ -191,6 +238,20 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         pvp.getObjective("vidas").getScore(event.getPlayer()).setScore(vidasJugador * 2);
         if(vidasJugador == 0)
             p.setGameMode(GameMode.SPECTATOR);
+        
+        BukkitTask hbTask = Bukkit.getScheduler().runTaskTimerAsynchronously(this, ()->{
+            heartbeatTask(p);
+        }, 0, 10);
+        hbTasks.put(p.getUniqueId(), hbTask);
+    }
+    
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event){
+        UUID uuid = event.getPlayer().getUniqueId();
+        hbTasks.remove(uuid).cancel();
+        hbTypes.remove(uuid);
+        hbTicksTillHeartbeat.remove(uuid);
+        
     }
     
     @EventHandler
@@ -332,6 +393,25 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         }
     }
     
+    @EventHandler
+    public void consumePlayerHeads(PlayerInteractEvent event){
+        Player p = event.getPlayer();
+        ItemStack stack = event.getPlayer().getInventory().getItemInMainHand();
+        if(stack.getType() != Material.PLAYER_HEAD) return;
+        if(p.isSneaking()) return;
+        
+        switch(event.getAction()){
+            case LEFT_CLICK_BLOCK, LEFT_CLICK_AIR, PHYSICAL -> { 
+                return;
+            }
+            case RIGHT_CLICK_BLOCK, RIGHT_CLICK_AIR -> event.setCancelled(true);
+            default -> throw new AssertionError(event.getAction().name());
+            
+        }
+        consumeHead(stack, p);
+        
+    }
+    
     public boolean isPlayerAllowedToUse(ItemStack stack, Player p){
         ItemMeta im = stack.getItemMeta();
         if (im == null) return true;
@@ -426,4 +506,203 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         SpigotPlugin.pvp.getTeam("combat").addPlayer(p);
         p.setDisplayName(ChatColor.DARK_RED+"⚔ "+p.getName());
     }
+    
+    public static ItemStack getHeavenPick(UUID uuid){
+        ItemStack pick = new ItemStack(Material.NETHERITE_PICKAXE);
+            pick.addUnsafeEnchantment(Enchantment.FORTUNE, 15);
+            pick.addUnsafeEnchantment(Enchantment.EFFICIENCY, 10);
+            Repairable im = (Repairable)pick.getItemMeta();
+            im.addItemFlags(ItemFlag.HIDE_ADDITIONAL_TOOLTIP, ItemFlag.HIDE_ENCHANTS, ItemFlag.HIDE_ATTRIBUTES);
+            im.addAttributeModifier(Attribute.GENERIC_ATTACK_DAMAGE, new AttributeModifier(NamespacedKey.fromString("generic.attack_damage"), 1, AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND));
+            im.addAttributeModifier(Attribute.GENERIC_ATTACK_SPEED, new AttributeModifier(NamespacedKey.fromString("generic.attack_speed"), 1, AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND));
+
+            im.setDisplayName(""+ChatColor.DARK_PURPLE+ChatColor.BOLD+"Regalo de los cielos");
+            im.setLore(
+                    List.of(
+                            ChatColor.GRAY+"Eficiencia X",
+                            ChatColor.GRAY+"Fortuna XV",
+                            ChatColor.LIGHT_PURPLE+"Una vez cada 2 horas, los dioses te brindan su ayuda,",
+                            ChatColor.LIGHT_PURPLE+"para evitar que te quedes rezagado/a.",
+                            ""+ChatColor.WHITE,
+                            ""+ChatColor.DARK_AQUA+ChatColor.BOLD+"[Ligado]",
+                            ""+ChatColor.AQUA+ChatColor.ITALIC+"Solo puede ser cogido del suelo y usado por ti.",
+                            ""+ChatColor.AQUA+ChatColor.ITALIC+"Indestructible mientras esté en el suelo."
+                            
+                    )
+            );
+            im.setRarity(ItemRarity.EPIC);
+            im.setRepairCost(999);
+            PersistentDataContainer pdc = im.getPersistentDataContainer();
+            NamespacedKey key = new NamespacedKey("cenikitopvp", "owner");
+            pdc.set(key, PersistentDataType.STRING, uuid.toString());
+            pick.setItemMeta(im);
+            pick.setDurability((short)3000);
+            return pick;
+    }
+    
+    public void heavenlyPickaxeTask(){
+        for(Player p : Bukkit.getOnlinePlayers()){
+            ItemStack[] inventory = p.getInventory().getStorageContents();
+            boolean hasSpace = false;
+            for(int i=0;i<inventory.length;i++){
+                if(inventory[i]==null){
+                    hasSpace = true;
+                    i=inventory.length;
+                }
+            }
+            ItemStack pick = getHeavenPick(p.getUniqueId());
+            p.playSound(p.getLocation(), Sound.ITEM_TRIDENT_THUNDER, SoundCategory.AMBIENT, 0.5f, 2);
+            if(hasSpace){
+                p.getInventory().addItem(pick);
+                p.sendMessage(ChatColor.DARK_GREEN+"[*] "+ChatColor.GREEN+"Los dioses te observan, entretenidos. Has recibido un regalo.");
+            } else {
+                p.getWorld().dropItem(p.getLocation(), pick);
+                p.sendMessage(ChatColor.DARK_GREEN+"[*] "+ChatColor.GREEN+"Los dioses te observan, entretenidos. Has recibido un regalo - pero tu inventario está lleno. Ha caído al suelo.");
+            }
+        }
+    }
+    
+    public static ItemStack getHead(Player p){
+        ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+        SkullMeta meta = (SkullMeta)head.getItemMeta();
+
+        meta.setOwningPlayer(p);
+        meta.setDisplayName(ChatColor.YELLOW+"Cabeza de "+ChatColor.AQUA+p.getName());
+        meta.setLore(List.of(
+                ChatColor.GRAY+"Vida Instantánea II "+ChatColor.RED+"(❤x5)",
+                ChatColor.GRAY+"Velocidad III (0:15)"
+        ));
+        PersistentDataContainer data = meta.getPersistentDataContainer();
+
+        NamespacedKey nk = new NamespacedKey("cenikitopvp", "playerhead");
+        data.set(nk, PersistentDataType.BOOLEAN, true);
+        head.setItemMeta(meta);
+        return head;
+    }
+    
+    public static void consumeHead(ItemStack stack, Player p){
+        int amount = stack.getAmount();
+        if(amount > 1)
+            stack.setAmount(amount - 1);
+        else
+            p.getInventory().remove(stack);
+        double newHealth = p.getHealth() + 10;
+        double maxHealth = p.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue();
+        if(newHealth > maxHealth){
+            newHealth = maxHealth;
+        }
+        p.setHealth(newHealth);
+        p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 15*20, 2));
+        p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_BURP, SoundCategory.PLAYERS, 1, 1);
+        p.sendMessage(ChatColor.GOLD+"[*] "+ChatColor.YELLOW+"¡Al comerte esa cabeza has restaurado "+ChatColor.GREEN+"5 "+ChatColor.YELLOW+"corazones de vida! Obtienes, además, 15 segundos de "+ChatColor.GREEN+"Velocidad III"+ChatColor.YELLOW+".");
+    }
+    public enum HeartbeatType{
+        FAR,CLOSE,CLOSER, CLOSEST
+    }
+    public static ConcurrentHashMap<UUID, HeartbeatType> hbTypes = new ConcurrentHashMap<>();
+    public static ConcurrentHashMap<UUID, Integer> hbTicksTillHeartbeat = new ConcurrentHashMap<>();
+    public static ConcurrentHashMap<UUID, BukkitTask> hbTasks = new ConcurrentHashMap<>();
+    public static void heartbeatTask(Player player){
+        if(inCombat.contains(player.getUniqueId())) return;
+        
+        Location playerLocation = player.getLocation();
+        World playerWorld = player.getWorld();
+        double smallestDistance = 500*500;
+        for(Player itPlayer : Bukkit.getOnlinePlayers()){
+            if(!player.equals(itPlayer)){
+                World itPlayerWorld = itPlayer.getWorld();
+                if(playerWorld.equals(itPlayerWorld)){
+                    Location itPlayerLocation = itPlayer.getLocation();
+                    double distance = playerLocation.distanceSquared(itPlayerLocation);
+                    /*if(itPlayer.isSneaking()){
+                        distance+=64*64;
+                    }*/
+                    if(distance < smallestDistance)
+                        smallestDistance = distance;
+                }
+            }
+            
+        }
+        UUID uuid = player.getUniqueId();
+        boolean playSound = false;
+        HeartbeatType type;
+        int ticksTillBeat;
+        ChatColor warningColor;
+        String alerta;
+        if(smallestDistance > 128*128){
+            hbTypes.remove(uuid);
+            hbTicksTillHeartbeat.remove(uuid);
+            return;
+        }
+        if(smallestDistance <= 128*128 && smallestDistance >= 64*64){
+            //FAR
+            type = HeartbeatType.FAR;
+            ticksTillBeat = 20;
+            warningColor = ChatColor.GRAY;
+            alerta = "Alguien lejos...";
+            
+        } else if(smallestDistance < 64*64 && smallestDistance >= 32*32){
+            //CLOSE
+            type = HeartbeatType.CLOSE;
+            ticksTillBeat = 10;
+            warningColor = ChatColor.YELLOW;
+            alerta = "Alguien cerca...";
+            
+        } else if(smallestDistance < 32*32 && smallestDistance >= 16*16){
+            //CLOSER
+            type = HeartbeatType.CLOSER;
+            ticksTillBeat = 4;
+            warningColor = ChatColor.GOLD;
+            alerta = "Alguien muy cerca...";
+            
+        } else {
+            //CLOSEST
+            type = HeartbeatType.CLOSEST;
+            ticksTillBeat = 2;
+            warningColor = ChatColor.RED;
+            alerta = "Alguien aquí...";
+        }
+        
+        if(!hbTypes.containsKey(uuid)){
+            hbTypes.put(uuid, type);
+            hbTicksTillHeartbeat.put(uuid, ticksTillBeat);
+            playSound = true;
+        }
+        
+        HeartbeatType actualhb = hbTypes.get(uuid);
+        int remainingTicks = hbTicksTillHeartbeat.get(uuid);
+        
+        if(actualhb != type){
+            hbTypes.put(uuid, type);
+            //if(ticksTillBeat < remainingTicks)
+            hbTicksTillHeartbeat.put(uuid, ticksTillBeat);
+            playSound = true;
+        } else {
+            remainingTicks--;
+
+            if(remainingTicks == 0){
+                playSound = true;
+                hbTicksTillHeartbeat.put(uuid, ticksTillBeat);
+            } else
+                hbTicksTillHeartbeat.put(uuid, remainingTicks);
+        }
+        PlayerData data;
+        try {
+            data = USERS.get(uuid);
+        } catch (SQLException ex) {
+            Logger.getLogger(SpigotPlugin.class.getName()).log(Level.SEVERE, null, ex);
+            return;
+        }
+        
+        if(data.isHeightenedSenses())
+            player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(warningColor+"⚠ "+alerta));
+        
+        if(playSound && data.isHearingHeartbeats()){
+            player.playSound(playerLocation, Sound.ENTITY_WARDEN_HEARTBEAT, SoundCategory.AMBIENT, 1, 1);
+
+            if(!data.isHeightenedSenses())
+                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(""+ChatColor.YELLOW+ChatColor.ITALIC+"...❤..."));
+        }
+    }
+    
 }
