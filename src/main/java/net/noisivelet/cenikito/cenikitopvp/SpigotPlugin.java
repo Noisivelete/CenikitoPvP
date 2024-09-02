@@ -73,6 +73,7 @@ import org.bukkit.event.enchantment.PrepareItemEnchantEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.entity.EntityResurrectEvent;
 import org.bukkit.event.hanging.HangingBreakByEntityEvent;
 import org.bukkit.event.inventory.InventoryPickupItemEvent;
 import org.bukkit.event.inventory.PrepareGrindstoneEvent;
@@ -412,6 +413,31 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         
     }
     
+    @EventHandler
+    public void onTotemUse(EntityResurrectEvent event){
+        if(event.getEntity().getType() != EntityType.PLAYER) return;
+        Player p = (Player)event.getEntity();
+        
+        PlayerData data;
+        try {
+            data = USERS.get(p.getUniqueId());
+        } catch (SQLException ex) {
+            Logger.getLogger(SpigotPlugin.class.getName()).log(Level.SEVERE, null, ex);
+            return;
+        }
+        
+        long last = data.getLastTotemUsed();
+        long now = System.currentTimeMillis();
+        if(now - last < 60*15*1000){
+            event.setCancelled(true);
+            p.sendMessage(ChatColor.GOLD+"[*] "+ChatColor.YELLOW+"Tu totem no ha podido utilizarse debido a que continúa en enfriamiento.");
+            return;
+        } else {
+            data.setLastTotemUsed(now);
+            p.sendMessage(ChatColor.GOLD+"[*] "+ChatColor.YELLOW+"¡Has usado un totem! No podrás usar otro hasta dentro de "+ChatColor.RED+"15 minutos"+ChatColor.YELLOW+".");
+        }
+    }
+    
     public boolean isPlayerAllowedToUse(ItemStack stack, Player p){
         ItemMeta im = stack.getItemMeta();
         if (im == null) return true;
@@ -603,7 +629,7 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
     public static ConcurrentHashMap<UUID, Integer> hbTicksTillHeartbeat = new ConcurrentHashMap<>();
     public static ConcurrentHashMap<UUID, BukkitTask> hbTasks = new ConcurrentHashMap<>();
     public static void heartbeatTask(Player player){
-        if(inCombat.contains(player.getUniqueId())) return;
+        if(inCombat.containsKey(player.getUniqueId())) return;
         
         Location playerLocation = player.getLocation();
         World playerWorld = player.getWorld();

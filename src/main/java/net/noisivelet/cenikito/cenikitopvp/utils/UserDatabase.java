@@ -24,14 +24,16 @@ public class UserDatabase {
         private long mercyRuleUntil;
         private boolean heightenedSenses;
         private boolean hearingHeartbeats;
+        private long lastTotemUsed;
 
-        public PlayerData(UUID uuid, boolean creadoEnderChest, int vidas, long mercyRuleUntil, boolean heightenedSenses, boolean hearingHeartbeats) {
+        public PlayerData(UUID uuid, boolean creadoEnderChest, int vidas, long mercyRuleUntil, boolean heightenedSenses, boolean hearingHeartbeats, long lastTotemUsed) {
             this.uuid = uuid;
             this.creadoEnderChest = creadoEnderChest;
             this.vidas = vidas;
             this.mercyRuleUntil = mercyRuleUntil;
             this.heightenedSenses = heightenedSenses;
             this.hearingHeartbeats = hearingHeartbeats;
+            this.lastTotemUsed = lastTotemUsed;
         }
         
         public PlayerData(UUID uuid){
@@ -39,6 +41,9 @@ public class UserDatabase {
             creadoEnderChest = false;
             vidas = 10;
             mercyRuleUntil = 0;
+            hearingHeartbeats = true;
+            heightenedSenses = false;
+            lastTotemUsed = 0;
             try {
                 SQLDatabase.queryInsert("INSERT INTO jugadores(uuid) VALUES(?)", uuid.toString());
             } catch (SQLException ex) {
@@ -118,6 +123,19 @@ public class UserDatabase {
                 Logger.getLogger(UserDatabase.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
+
+        public long getLastTotemUsed() {
+            return lastTotemUsed;
+        }
+
+        public void setLastTotemUsed(long lastTotemUsed) {
+            this.lastTotemUsed = lastTotemUsed;
+            try {
+                SQLDatabase.queryDML("UPDATE jugadores SET last_totem_used=? WHERE uuid=?", lastTotemUsed+"", uuid.toString());
+            } catch (SQLException ex) {
+                Logger.getLogger(UserDatabase.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
         
         
     }
@@ -134,7 +152,7 @@ public class UserDatabase {
                     cache.put(key, new PlayerData(key));
                 else{
                     HashMap<String,String> row = query.get(0);
-                    cache.put(key, new PlayerData(UUID.fromString(row.get("uuid")), row.get("creado_ender_chest").equals("1"), Integer.parseInt(row.get("vidas")), Long.parseLong(row.get("mercy_rule_until")), row.get("heightened_senses").equals("1"), row.get("hearing_heartbeats").equals("1")));
+                    cache.put(key, new PlayerData(UUID.fromString(row.get("uuid")), row.get("creado_ender_chest").equals("1"), Integer.parseInt(row.get("vidas")), Long.parseLong(row.get("mercy_rule_until")), row.get("heightened_senses").equals("1"), row.get("hearing_heartbeats").equals("1"), Long.parseLong(row.get("last_totem_used"))));
                 }
             }
             
