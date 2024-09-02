@@ -7,6 +7,7 @@ package net.noisivelet.cenikito.cenikitopvp;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
+import org.bukkit.World.Environment;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
@@ -25,6 +26,10 @@ public class WitherModifier implements Listener {
     public void onWitherSpawn(EntitySpawnEvent event){
         Entity e = event.getEntity();
         if(e.getType() != EntityType.WITHER) return;
+        if(event.getLocation().getWorld().getEnvironment() != Environment.NETHER){
+            event.setCancelled(true);
+            return;
+        }
         
         Wither w = (Wither)e;
         ((LivingEntity)e).setCollidable(false);
