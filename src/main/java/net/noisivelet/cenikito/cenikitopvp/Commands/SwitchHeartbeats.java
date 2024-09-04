@@ -7,7 +7,9 @@ package net.noisivelet.cenikito.cenikitopvp.Commands;
 import java.sql.SQLException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import static net.noisivelet.cenikito.cenikitopvp.SpigotPlugin.CONFIG;
 import static net.noisivelet.cenikito.cenikitopvp.SpigotPlugin.USERS;
+import net.noisivelet.cenikito.cenikitopvp.utils.PluginConfig;
 import net.noisivelet.cenikito.cenikitopvp.utils.UserDatabase.PlayerData;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
@@ -24,6 +26,14 @@ public class SwitchHeartbeats implements CommandExecutor{
     @Override
     public boolean onCommand(CommandSender cs, Command cmnd, String string, String[] strings) {
         if(!(cs instanceof Player)) return false;
+        try {
+            if(CONFIG.get(PluginConfig.Key.IS_PVP_ENABLED).equals("0")){
+                cs.sendMessage(ChatColor.DARK_GRAY+"[*] "+ChatColor.GRAY+"La funcionalidad de latidos se activará cuando se active el PvP en el servidor.");
+                return true;
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
         Player p = (Player)cs;
         PlayerData data;
         try {

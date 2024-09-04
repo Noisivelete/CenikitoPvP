@@ -7,6 +7,7 @@ package net.noisivelet.cenikito.cenikitopvp;
 import java.sql.SQLException;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.md_5.bungee.api.ChatMessageType;
@@ -39,7 +40,7 @@ import org.bukkit.scheduler.BukkitTask;
  *
  * @author Francis
  */
-public class PvPDisconnectPrevention implements Listener {
+public class PvP implements Listener {
 
     public static ConcurrentHashMap<UUID, Long> inCombat = new ConcurrentHashMap<>();
 
@@ -105,7 +106,7 @@ public class PvPDisconnectPrevention implements Listener {
         try {
             pvpActive = CONFIG.get(PluginConfig.Key.IS_PVP_ENABLED).equals("1");
         } catch (SQLException ex) {
-            Logger.getLogger(PvPDisconnectPrevention.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(PvP.class.getName()).log(Level.SEVERE, null, ex);
         }
         
         if(!pvpActive){
@@ -128,7 +129,7 @@ public class PvPDisconnectPrevention implements Listener {
             try {
                 data = USERS.get(damager.getUniqueId());
             } catch (SQLException ex) {
-                Logger.getLogger(PvPDisconnectPrevention.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(PvP.class.getName()).log(Level.SEVERE, null, ex);
                 return;
             }
             data.setMercyRuleUntil(0);
@@ -165,7 +166,7 @@ public class PvPDisconnectPrevention implements Listener {
         try {
             pdata = USERS.get(p.getUniqueId());
         } catch (SQLException ex) {
-            Logger.getLogger(PvPDisconnectPrevention.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(PvP.class.getName()).log(Level.SEVERE, null, ex);
             return;
         }
         int vidasRestantes = pdata.getVidas();
@@ -210,7 +211,7 @@ public class PvPDisconnectPrevention implements Listener {
                 try {
                     Thread.sleep(250);
                 } catch (InterruptedException ex) {
-                    Logger.getLogger(PvPDisconnectPrevention.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(PvP.class.getName()).log(Level.SEVERE, null, ex);
                 }
             } else {
                 p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.GREEN+"⚔ --:--:---"));
@@ -249,23 +250,32 @@ public class PvPDisconnectPrevention implements Listener {
         try {
             data = USERS.get(p.getUniqueId());
         } catch (SQLException ex) {
-            Logger.getLogger(PvPDisconnectPrevention.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(PvP.class.getName()).log(Level.SEVERE, null, ex);
             return;
         }
         data.setMercyRuleUntil(0);
     }
     
     public static void addToMercyRule(Player p){
-        addToMercyRule(p, System.currentTimeMillis()+15*60*1000);
+        addToMercyRule(p, System.currentTimeMillis()+15*60*1000, false);
     }
     
-    public static void addToMercyRule(Player p, long until){
+    public static void addToMercyRule(Player p, long until, boolean wasAdmin){
         SpigotPlugin.addToSafeTeam(p);
         long remaining = until - System.currentTimeMillis();
         long remainingTicks = (remaining / 1000) * 20;
         BukkitTask task = Bukkit.getScheduler().runTaskLater(SpigotPlugin.plugin, ()->{removeMercyRuleTask(p);}, remainingTicks);
         mercyRule.put(p.getUniqueId(), task);
-        p.sendMessage(ChatColor.GOLD+"[*] "+ChatColor.YELLOW+"Se ha activado la regla de clemencia: Eres inmune al daño de otros jugadores durante los siguientes 15 minutos, o hasta que ataques a alguno.");
-
+        try {
+            PlayerData data = USERS.get(p.getUniqueId());
+            data.setMercyRuleUntil(until);
+        } catch (SQLException ex) {
+            Logger.getLogger(PvP.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        
+        if(!wasAdmin)
+            p.sendMessage(ChatColor.GOLD+"[*] "+ChatColor.YELLOW+"Se ha activado la regla de clemencia: Eres inmune al daño de otros jugadores durante "+ChatColor.RED+SpigotPlugin.timeToString(remaining, TimeUnit.MILLISECONDS)+ChatColor.YELLOW+" o hasta que ataques a alguien.");
+        else
+            p.sendMessage(ChatColor.GOLD+"[*] "+ChatColor.YELLOW+"Un administrador te ha activado la regla de clemencia: Serás inmune al daño de otros jugadores durante "+ChatColor.RED+SpigotPlugin.timeToString(remaining, TimeUnit.MILLISECONDS)+ChatColor.YELLOW+" o hasta que ataques a alguien.");
     }
 }

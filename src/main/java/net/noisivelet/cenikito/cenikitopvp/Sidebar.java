@@ -41,14 +41,13 @@ public class Sidebar {
         score8.setScore(8);
         
         if(time.startsWith("-")){
-            executePayload();
             try {
                 CONFIG.store(PluginConfig.Key.NEXT_EVENT_NAME, "Ninguno");
                 CONFIG.store(PluginConfig.Key.NEXT_EVENT_TIME, "-1");
             } catch (SQLException ex) {
-                Logger.getLogger(Sidebar.class.getName()).log(Level.SEVERE, null, ex);
+                ex.printStackTrace();
             }
-            
+            executePayload();
         }
     }
 
@@ -99,16 +98,12 @@ public class Sidebar {
             try {
                 Method payloadMethod = EventControl.class.getMethod(payload, null);
                 payloadMethod.invoke(null);
-            } catch (NoSuchMethodException ex) {
-                Logger.getLogger(Sidebar.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (IllegalAccessException ex) {
-                Logger.getLogger(Sidebar.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (InvocationTargetException ex) {
-                Logger.getLogger(Sidebar.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException ex) {
+                ex.printStackTrace();
             }
             CONFIG.store(PluginConfig.Key.NEXT_EVENT_PAYLOAD, "");
         } catch (SQLException | SecurityException ex) {
-            Logger.getLogger(Sidebar.class.getName()).log(Level.SEVERE, null, ex);
+            ex.printStackTrace();
         }
     }
 
@@ -116,7 +111,7 @@ public class Sidebar {
         try {
             CONFIG.store(PluginConfig.Key.NEXT_EVENT_PAYLOAD, string);
         } catch (SQLException ex) {
-            Logger.getLogger(Sidebar.class.getName()).log(Level.SEVERE, null, ex);
+            ex.printStackTrace();
         }
     }
 }

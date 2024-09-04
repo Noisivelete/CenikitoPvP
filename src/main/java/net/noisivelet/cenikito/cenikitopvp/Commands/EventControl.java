@@ -5,20 +5,15 @@
 package net.noisivelet.cenikito.cenikitopvp.Commands;
 
 import java.sql.SQLException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import net.md_5.bungee.api.ChatMessageType;
+import net.noisivelet.cenikito.cenikitopvp.Sidebar;
 import net.noisivelet.cenikito.cenikitopvp.SpigotPlugin;
 import static net.noisivelet.cenikito.cenikitopvp.SpigotPlugin.CONFIG;
 import net.noisivelet.cenikito.cenikitopvp.utils.PluginConfig;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.Server;
+import org.bukkit.GameRule;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 /**
@@ -26,6 +21,14 @@ import org.bukkit.entity.Player;
  * @author Francis
  */
 public class EventControl{
+    public static void start() throws SQLException {
+        Bukkit.getWorld("cenikitopvp").getWorldBorder().setSize(5000, 420);
+        Bukkit.getWorld("cenikitopvp").setGameRule(GameRule.DO_DAYLIGHT_CYCLE, true);
+        Sidebar.setNextEventTime(System.currentTimeMillis()+60*60*2*1000);
+        Sidebar.setNextEventPayload("pvp");
+        Sidebar.setNextEventName("Se activa PvP");
+        Sidebar.updateSidebar();
+    }
     public static void pvp() throws SQLException {
         boolean active = CONFIG.get(PluginConfig.Key.IS_PVP_ENABLED).equals("1");
         if(active){
@@ -39,10 +42,15 @@ public class EventControl{
                 SpigotPlugin.addToPvPTeam(p);
                 p.playSound(p.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, SoundCategory.MASTER, 1, 1);
             }
+            if(CONFIG.get(PluginConfig.Key.IS_NETHER_ENABLED).equals("0")){
+                Sidebar.setNextEventTime(System.currentTimeMillis()+60*1000);
+                Sidebar.setNextEventPayload("nether");
+                Sidebar.setNextEventName("El Nether se activa");
+                Sidebar.updateSidebar();
+            }
         }
         
         CONFIG.store(PluginConfig.Key.IS_PVP_ENABLED, active?"0":"1");
-        
     }
     
     public static void nether() throws SQLException {

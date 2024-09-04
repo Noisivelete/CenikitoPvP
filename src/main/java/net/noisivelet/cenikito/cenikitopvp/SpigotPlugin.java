@@ -29,9 +29,10 @@ import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.noisivelet.cenikito.cenikitopvp.Commands.CheckClosestDistance;
 import net.noisivelet.cenikito.cenikitopvp.Commands.GetPlayerHead;
+import net.noisivelet.cenikito.cenikitopvp.Commands.MercyRuleSwitch;
 import net.noisivelet.cenikito.cenikitopvp.Commands.SwitchHeartbeats;
 import net.noisivelet.cenikito.cenikitopvp.Commands.VidasCommand;
-import static net.noisivelet.cenikito.cenikitopvp.PvPDisconnectPrevention.inCombat;
+import static net.noisivelet.cenikito.cenikitopvp.PvP.inCombat;
 import net.noisivelet.cenikito.cenikitopvp.packets.WrapperPlayServerLogin;
 import net.noisivelet.cenikito.cenikitopvp.utils.PluginConfig;
 import net.noisivelet.cenikito.cenikitopvp.utils.SQLDatabase;
@@ -122,7 +123,7 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
             return;
         }
         Bukkit.getPluginManager().registerEvents(this,this);
-        Bukkit.getPluginManager().registerEvents(new PvPDisconnectPrevention(), this);
+        Bukkit.getPluginManager().registerEvents(new PvP(), this);
         Bukkit.getPluginManager().registerEvents(new WitherModifier(), this);
         Bukkit.getPluginManager().registerEvents(new PotionOfHeightenedSenses(), this);
         this.getCommand("heavenpick").setExecutor(new HeavenPick());
@@ -131,6 +132,7 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         this.getCommand("head").setExecutor(new GetPlayerHead());
         this.getCommand("distancia").setExecutor(new CheckClosestDistance());
         this.getCommand("latidos").setExecutor(new SwitchHeartbeats());
+        this.getCommand("mercy").setExecutor(new MercyRuleSwitch());
         
         ProtocolLibrary.getProtocolManager().addPacketListener(
                 new PacketAdapter(this, PacketType.Play.Server.LOGIN) {
@@ -214,10 +216,10 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         int vidasJugador = data.getVidas();
         long mercyRulePlayer = data.getMercyRuleUntil();
         if(!mercyRule.containsKey(p.getUniqueId()) && mercyRulePlayer != 0){
-            PvPDisconnectPrevention.addToMercyRule(p, mercyRulePlayer);
+            PvP.addToMercyRule(p, mercyRulePlayer, false);
         }
         
-        if(pvpEnabled){
+        if(pvpEnabled && !mercyRule.containsKey(p.getUniqueId())){
             addToPvPTeam(p);
         } else{
             addToSafeTeam(p);
@@ -360,7 +362,6 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         int slot = event.getNewSlot();
         ItemStack stack = event.getPlayer().getInventory().getItem(slot);
         if(stack == null) return;
-        System.out.println("HeldItem new item: "+stack.getType().name());
         if(!isPlayerAllowedToUse(stack, event.getPlayer())){
             p.getInventory().remove(stack);
             p.getWorld().dropItem(p.getLocation(), stack);
@@ -615,6 +616,12 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
     public static ConcurrentHashMap<UUID, Integer> hbTicksTillHeartbeat = new ConcurrentHashMap<>();
     public static ConcurrentHashMap<UUID, BukkitTask> hbTasks = new ConcurrentHashMap<>();
     public static void heartbeatTask(Player player){
+        try {
+            if(CONFIG.get(PluginConfig.Key.IS_PVP_ENABLED).equals("0")) return;
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+        
         if(inCombat.containsKey(player.getUniqueId())) return;
         
         Location playerLocation = player.getLocation();

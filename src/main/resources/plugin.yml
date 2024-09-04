@@ -31,3 +31,7 @@ commands:
     latidos:
         description: Cambia si oirás o no latidos cuando haya gente cerca tuya
         usage: /<command>
+    mercy:
+        description: Activa una mercyRule para un usuario
+        usage: /<command>
+        permission: cenikitopvp.mercyRule.switch
