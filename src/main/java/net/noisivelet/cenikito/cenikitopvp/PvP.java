@@ -274,8 +274,8 @@ public class PvP implements Listener {
         }
         
         if(!wasAdmin)
-            p.sendMessage(ChatColor.GOLD+"[*] "+ChatColor.YELLOW+"Se ha activado la regla de clemencia: Eres inmune al daño de otros jugadores durante "+ChatColor.RED+SpigotPlugin.timeToString(remaining, TimeUnit.MILLISECONDS)+ChatColor.YELLOW+" o hasta que ataques a alguien.");
+            p.sendMessage(ChatColor.GOLD+"[*] "+ChatColor.YELLOW+"Se ha activado la regla de clemencia: Eres inmune al daño de otros jugadores durante "+ChatColor.RED+SpigotPlugin.timeToString(remaining, TimeUnit.MILLISECONDS)+ChatColor.YELLOW+"o hasta que ataques a alguien.");
         else
-            p.sendMessage(ChatColor.GOLD+"[*] "+ChatColor.YELLOW+"Un administrador te ha activado la regla de clemencia: Serás inmune al daño de otros jugadores durante "+ChatColor.RED+SpigotPlugin.timeToString(remaining, TimeUnit.MILLISECONDS)+ChatColor.YELLOW+" o hasta que ataques a alguien.");
+            p.sendMessage(ChatColor.GOLD+"[*] "+ChatColor.YELLOW+"Un administrador te ha activado la regla de clemencia: Serás inmune al daño de otros jugadores durante "+ChatColor.RED+SpigotPlugin.timeToString(remaining, TimeUnit.MILLISECONDS)+ChatColor.YELLOW+"o hasta que ataques a alguien.");
     }
 }

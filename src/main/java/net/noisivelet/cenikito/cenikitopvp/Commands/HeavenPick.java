@@ -27,12 +27,11 @@ public class HeavenPick implements CommandExecutor{
             return true;
         }
         
-        if(!(cs instanceof Player)){
-            cs.sendMessage(ChatColor.DARK_RED+"[*] "+ChatColor.RED+"No disponible en consola.");
+        if(strings.length != 1) return false;
+        if(strings[0].equals(".everyone")){
+            SpigotPlugin.heavenlyPickaxeTask();
             return true;
         }
-        
-        if(strings.length != 1) return false;
         Player p = Bukkit.getPlayer(strings[0]);
         
         ItemStack heavenPick = SpigotPlugin.getHeavenPick(p.getUniqueId());

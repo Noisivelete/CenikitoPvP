@@ -57,6 +57,7 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import static org.bukkit.event.block.Action.LEFT_CLICK_AIR;
@@ -197,7 +198,11 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         Player p = event.getPlayer();
         /*event.getPlayer().setMaxHealth(2);
         event.getPlayer().sendMessage("[*] Setting HP to 2");*/
-        p.setScoreboard(pvp);
+        try{
+            p.setScoreboard(pvp);
+        } catch(Exception ex){
+            ex.printStackTrace();
+        }
         
         boolean pvpEnabled = true;
         try {
@@ -288,6 +293,7 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
     public void onEntityPickupItemEvent(EntityPickupItemEvent event){
         ItemStack is = event.getItem().getItemStack();
         ItemMeta meta = is.getItemMeta();
+        if(meta == null) return;
         PersistentDataContainer container = meta.getPersistentDataContainer();
         String str = container.get(new NamespacedKey("cenikitopvp", "owner"), PersistentDataType.STRING);
         if(str == null) return;
@@ -314,8 +320,11 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         if(!isFragile(is)) setFragile(is);
     }
     
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void preventFragileEnchant(PrepareItemEnchantEvent event){
+        if(event.isCancelled()){
+            event.setCancelled(false);
+        }
         ItemStack is = event.getItem();
         if(!isFragile(is)) return;
         event.setCancelled(true);
@@ -403,6 +412,7 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
     @EventHandler
     public void onTotemUse(EntityResurrectEvent event){
         if(event.getEntity().getType() != EntityType.PLAYER) return;
+        if(event.isCancelled()) return; //Si no tiene un totem equipado, esto se llama en estado cancelado.
         Player p = (Player)event.getEntity();
         
         PlayerData data;
@@ -479,11 +489,11 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
     }
     
     private boolean isFragile(ItemStack is){
-        is.removeEnchantments();
         ItemMeta meta = is.getItemMeta();
         PersistentDataContainer container = meta.getPersistentDataContainer();
         NamespacedKey nk = new NamespacedKey("cenikitopvp", "fragil");
-        return container.get(nk, PersistentDataType.BOOLEAN) != null;
+        boolean fragile = container.has(nk);
+        return fragile;
     }
 
     private void setFragile(ItemStack is) {
@@ -553,7 +563,7 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
             return pick;
     }
     
-    public void heavenlyPickaxeTask(){
+    public static void heavenlyPickaxeTask(){
         for(Player p : Bukkit.getOnlinePlayers()){
             ItemStack[] inventory = p.getInventory().getStorageContents();
             boolean hasSpace = false;
