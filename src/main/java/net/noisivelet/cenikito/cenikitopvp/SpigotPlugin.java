@@ -13,6 +13,7 @@ import com.comphenix.protocol.events.PacketEvent;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -324,6 +325,11 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
     public void preventFragileEnchant(PrepareItemEnchantEvent event){
         if(event.isCancelled()){
             event.setCancelled(false);
+        }
+        Map<Enchantment, Integer> enchants = event.getItem().getEnchantments();
+        if(!enchants.isEmpty()){
+            event.setCancelled(true);
+            return;
         }
         ItemStack is = event.getItem();
         if(!isFragile(is)) return;
