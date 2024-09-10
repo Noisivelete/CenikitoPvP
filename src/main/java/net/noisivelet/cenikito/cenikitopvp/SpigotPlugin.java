@@ -30,6 +30,7 @@ import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.noisivelet.cenikito.cenikitopvp.Commands.CheckClosestDistance;
 import net.noisivelet.cenikito.cenikitopvp.Commands.GetPlayerHead;
+import net.noisivelet.cenikito.cenikitopvp.Commands.HpSenseTypesChange;
 import net.noisivelet.cenikito.cenikitopvp.Commands.MercyRuleSwitch;
 import net.noisivelet.cenikito.cenikitopvp.Commands.SwitchHeartbeats;
 import net.noisivelet.cenikito.cenikitopvp.Commands.VidasCommand;
@@ -48,9 +49,11 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
+import org.bukkit.World.Environment;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.block.Block;
+import org.bukkit.boss.DragonBattle;
 import org.bukkit.damage.DamageType;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Entity;
@@ -128,6 +131,7 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         Bukkit.getPluginManager().registerEvents(new PvP(), this);
         Bukkit.getPluginManager().registerEvents(new WitherModifier(), this);
         Bukkit.getPluginManager().registerEvents(new PotionOfHeightenedSenses(), this);
+        Bukkit.getPluginManager().registerEvents(new EnderDragonFight(), this);
         this.getCommand("heavenpick").setExecutor(new HeavenPick());
         this.getCommand("evento").setExecutor(new SidebarEditCommands());
         this.getCommand("vidas").setExecutor(new VidasCommand());
@@ -135,6 +139,7 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         this.getCommand("distancia").setExecutor(new CheckClosestDistance());
         this.getCommand("latidos").setExecutor(new SwitchHeartbeats());
         this.getCommand("mercy").setExecutor(new MercyRuleSwitch());
+        this.getCommand("mostrarvida").setExecutor(new HpSenseTypesChange());
         
         ProtocolLibrary.getProtocolManager().addPacketListener(
                 new PacketAdapter(this, PacketType.Play.Server.LOGIN) {
@@ -177,11 +182,12 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         
         ShapedRecipe recipe = new ShapedRecipe(nk, PotionOfHeightenedSenses.getPotion());
         
-        recipe.shape("H H"," P "," S ");
+        recipe.shape("HDH"," P "," S ");
         
         recipe.setIngredient('H', Material.PLAYER_HEAD);
         recipe.setIngredient('P', Material.DRAGON_BREATH);
         recipe.setIngredient('S', Material.CALIBRATED_SCULK_SENSOR);
+        recipe.setIngredient('D', Material.DRAGON_EGG);
         Bukkit.addRecipe(recipe);
         
         Bukkit.getScheduler().runTaskTimer(this, ()->{
@@ -234,7 +240,7 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
         if(vidasJugador == 0)
             p.setGameMode(GameMode.SPECTATOR);
         
-        BukkitTask hbTask = Bukkit.getScheduler().runTaskTimerAsynchronously(this, ()->{
+        BukkitTask hbTask = Bukkit.getScheduler().runTaskTimer(this, ()->{
             heartbeatTask(p);
         }, 0, 10);
         hbTasks.put(p.getUniqueId(), hbTask);
@@ -636,6 +642,24 @@ public class SpigotPlugin extends JavaPlugin implements Listener{
             if(CONFIG.get(PluginConfig.Key.IS_PVP_ENABLED).equals("0")) return;
         } catch (SQLException ex) {
             ex.printStackTrace();
+        }
+        
+        DragonBattle dragon = player.getLocation().getWorld().getEnderDragonBattle();
+        if(dragon != null && dragon.getEnderDragon() != null){
+            PlayerData data;
+            try {
+                data = USERS.get(player.getUniqueId());
+            } catch (SQLException ex) {
+                Logger.getLogger(SpigotPlugin.class.getName()).log(Level.SEVERE, null, ex);
+                return;
+            }
+            
+            if(dragon.getEnderDragon().getLocation().distanceSquared(player.getLocation()) < 1000*1000 && data.isHearingHeartbeats()){
+                player.playSound(player.getLocation(), Sound.ENTITY_WARDEN_HEARTBEAT, SoundCategory.AMBIENT, 1, 1);
+                //player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(""+ChatColor.RED+ChatColor.ITALIC+"...❤..."));
+                return;
+            }
+            
         }
         
         if(inCombat.containsKey(player.getUniqueId())) return;

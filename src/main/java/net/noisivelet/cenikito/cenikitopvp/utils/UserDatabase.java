@@ -18,6 +18,9 @@ import java.util.logging.Logger;
  */
 public class UserDatabase {
     public static class PlayerData{
+        public enum SensingHealthType{
+            ALL, PLAYERS, NONE
+        }
         private UUID uuid;
         private boolean creadoEnderChest;
         private int vidas;
@@ -25,8 +28,9 @@ public class UserDatabase {
         private boolean heightenedSenses;
         private boolean hearingHeartbeats;
         private long lastTotemUsed;
+        private SensingHealthType hpSenseTypes; 
 
-        public PlayerData(UUID uuid, boolean creadoEnderChest, int vidas, long mercyRuleUntil, boolean heightenedSenses, boolean hearingHeartbeats, long lastTotemUsed) {
+        public PlayerData(UUID uuid, boolean creadoEnderChest, int vidas, long mercyRuleUntil, boolean heightenedSenses, boolean hearingHeartbeats, long lastTotemUsed, SensingHealthType hpSenseTypes) {
             this.uuid = uuid;
             this.creadoEnderChest = creadoEnderChest;
             this.vidas = vidas;
@@ -34,6 +38,7 @@ public class UserDatabase {
             this.heightenedSenses = heightenedSenses;
             this.hearingHeartbeats = hearingHeartbeats;
             this.lastTotemUsed = lastTotemUsed;
+            this.hpSenseTypes = hpSenseTypes;
         }
         
         public PlayerData(UUID uuid){
@@ -44,6 +49,7 @@ public class UserDatabase {
             hearingHeartbeats = true;
             heightenedSenses = false;
             lastTotemUsed = 0;
+            hpSenseTypes = SensingHealthType.ALL;
             try {
                 SQLDatabase.queryInsert("INSERT INTO jugadores(uuid) VALUES(?)", uuid.toString());
             } catch (SQLException ex) {
@@ -136,7 +142,19 @@ public class UserDatabase {
                 Logger.getLogger(UserDatabase.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
-        
+
+        public SensingHealthType getHpSenseTypes() {
+            return hpSenseTypes;
+        }
+
+        public void setHpSenseTypes(SensingHealthType hpSenseTypes) {
+            this.hpSenseTypes = hpSenseTypes;
+            try {
+                SQLDatabase.queryDML("UPDATE jugadores SET hp_sense_types=? WHERE uuid=?", hpSenseTypes.name(), uuid.toString());
+            } catch (SQLException ex) {
+                Logger.getLogger(UserDatabase.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
         
     }
     
@@ -152,7 +170,15 @@ public class UserDatabase {
                     cache.put(key, new PlayerData(key));
                 else{
                     HashMap<String,String> row = query.get(0);
-                    cache.put(key, new PlayerData(UUID.fromString(row.get("uuid")), row.get("creado_ender_chest").equals("1"), Integer.parseInt(row.get("vidas")), Long.parseLong(row.get("mercy_rule_until")), row.get("heightened_senses").equals("1"), row.get("hearing_heartbeats").equals("1"), Long.parseLong(row.get("last_totem_used"))));
+                    cache.put(key, new PlayerData(
+                            UUID.fromString(row.get("uuid")),
+                            row.get("creado_ender_chest").equals("1"),
+                            Integer.parseInt(row.get("vidas")),
+                            Long.parseLong(row.get("mercy_rule_until")),
+                            row.get("heightened_senses").equals("1"),
+                            row.get("hearing_heartbeats").equals("1"),
+                            Long.parseLong(row.get("last_totem_used")),
+                            PlayerData.SensingHealthType.valueOf(row.get("hp_sense_types"))));
                 }
             }
             

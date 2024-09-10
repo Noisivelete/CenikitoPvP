@@ -14,6 +14,7 @@ import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import static net.noisivelet.cenikito.cenikitopvp.SpigotPlugin.CONFIG;
 import static net.noisivelet.cenikito.cenikitopvp.SpigotPlugin.USERS;
+import static net.noisivelet.cenikito.cenikitopvp.SpigotPlugin.addToPvPTeam;
 import static net.noisivelet.cenikito.cenikitopvp.SpigotPlugin.getHead;
 import static net.noisivelet.cenikito.cenikitopvp.SpigotPlugin.mercyRule;
 import net.noisivelet.cenikito.cenikitopvp.utils.PluginConfig;
@@ -21,6 +22,8 @@ import net.noisivelet.cenikito.cenikitopvp.utils.UserDatabase.PlayerData;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
+import org.bukkit.World.Environment;
+import org.bukkit.boss.DragonBattle;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -188,9 +191,11 @@ public class PvP implements Listener {
             }
             
             UUID uuid = p.getUniqueId();
-            inCombat.remove(uuid);
-            p.sendMessage(ChatColor.DARK_GREEN+"[*] "+ChatColor.GREEN+"Has dejado de estar en combate. Puedes desconectarte.");
-            addToMercyRule(p);
+            long time = inCombat.remove(uuid);
+            if(time != 0L){ //Evita añadir a la regla de clemencia a gente que esté en combate contra el dragón.
+                addToMercyRule(p);
+                p.sendMessage(ChatColor.DARK_GREEN+"[*] "+ChatColor.GREEN+"Has dejado de estar en combate. Puedes desconectarte.");
+            }
         }
         
         p.sendMessage(ChatColor.DARK_PURPLE+"[*] "+ChatColor.LIGHT_PURPLE+"Te quedan "+ChatColor.RED+(vidasRestantes-1)+ChatColor.LIGHT_PURPLE+" vidas.");
@@ -220,6 +225,13 @@ public class PvP implements Listener {
                 p.sendMessage(ChatColor.DARK_GREEN+"[*] "+ChatColor.GREEN+"Has dejado de estar en combate. Puedes desconectarte.");
             }
         }
+    }
+    
+    public static void startDragonCombat(Player player){
+        SpigotPlugin.addToCombatTeam(player);
+        inCombat.put(player.getUniqueId(), 0L);
+        player.sendMessage("" + ChatColor.DARK_RED + ChatColor.BOLD + "[*] " + ChatColor.RED + ChatColor.BOLD + "ESTÁS EN COMBATE CONTRA " + ChatColor.YELLOW + ChatColor.BOLD + "EL DRAGÓN" + ChatColor.RED + ChatColor.BOLD + ". NO TE DESCONECTES.");
+        dragonCombatTasks.put(player.getUniqueId(), Bukkit.getScheduler().runTaskTimer(SpigotPlugin.plugin, ()->{PvP.combatTaskDragon(player);}, 10, 20));
     }
     
     public void startCombat(Player damager, Player defender){
@@ -277,5 +289,23 @@ public class PvP implements Listener {
             p.sendMessage(ChatColor.GOLD+"[*] "+ChatColor.YELLOW+"Se ha activado la regla de clemencia: Eres inmune al daño de otros jugadores durante "+ChatColor.RED+SpigotPlugin.timeToString(remaining, TimeUnit.MILLISECONDS)+ChatColor.YELLOW+"o hasta que ataques a alguien.");
         else
             p.sendMessage(ChatColor.GOLD+"[*] "+ChatColor.YELLOW+"Un administrador te ha activado la regla de clemencia: Serás inmune al daño de otros jugadores durante "+ChatColor.RED+SpigotPlugin.timeToString(remaining, TimeUnit.MILLISECONDS)+ChatColor.YELLOW+"o hasta que ataques a alguien.");
+    }
+
+    public static ConcurrentHashMap<UUID, BukkitTask> dragonCombatTasks = new ConcurrentHashMap<>();
+    public static void combatTaskDragon(Player player) {
+        DragonBattle battle = player.getWorld().getEnderDragonBattle();
+        System.out.println(battle);
+        if(battle != null)
+            System.out.println(battle.getEnderDragon());
+        if(battle != null && !battle.hasBeenPreviouslyKilled())
+            player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED+"⚔ ∞:∞"));
+        else{
+            inCombat.remove(player.getUniqueId());
+            player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.GREEN+"⚔ --:--:---"));
+            SpigotPlugin.addToPvPTeam(player);
+            player.sendMessage(ChatColor.DARK_GREEN+"[*] "+ChatColor.GREEN+"Has dejado de estar en combate. Puedes desconectarte.");
+            dragonCombatTasks.remove(player.getUniqueId()).cancel();
+        }
+        
     }
 }

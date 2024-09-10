@@ -5,6 +5,7 @@
 package net.noisivelet.cenikito.cenikitopvp;
 
 import java.sql.SQLException;
+import java.text.DecimalFormat;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -18,9 +19,13 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Damageable;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -60,6 +65,47 @@ public class PotionOfHeightenedSenses implements Listener{
         }
     }
     
+    @EventHandler
+    public void onPlayerAttackGetHP(EntityDamageEvent event){
+        Entity damager = event.getDamageSource().getCausingEntity();
+        if(!(damager instanceof Player)) return;
+        
+        Entity defenderEntity = event.getEntity();
+        if(!(defenderEntity instanceof Damageable)) return;
+        Damageable defenderDamageable = (Damageable)defenderEntity;
+        
+        
+        PlayerData data;
+        try {
+            data = USERS.get(damager.getUniqueId());
+        } catch (SQLException ex) {
+            Logger.getLogger(PvP.class.getName()).log(Level.SEVERE, null, ex);
+            return;
+        }
+        if(data.isHeightenedSenses()){
+            switch(data.getHpSenseTypes()){
+                case PLAYERS -> {
+                    if(defenderEntity.getType() != EntityType.PLAYER) return;
+                }
+                case NONE -> {
+                    return;
+                }
+                
+            }
+            double finalDamage = event.getFinalDamage();
+            double remainingHPDouble=defenderDamageable.getHealth()-finalDamage;
+            String remainingHP;
+            if(remainingHPDouble <=0)
+                remainingHP = "☠";
+            else{
+                DecimalFormat df = new DecimalFormat();
+            df.setMaximumFractionDigits(1);
+                remainingHP = df.format(remainingHPDouble);
+            }
+            damager.sendMessage(ChatColor.YELLOW+defenderDamageable.getName()+":"+ChatColor.RED+" ❤ "+remainingHP);
+        }
+    }
+    
     public static ItemStack getPotion(){
         ItemStack potion = new ItemStack(Material.POTION);
         PotionMeta meta = (PotionMeta)potion.getItemMeta();
@@ -72,6 +118,7 @@ public class PotionOfHeightenedSenses implements Listener{
         meta.setLore(List.of(
                 ChatColor.LIGHT_PURPLE+"Tomar esta poción incrementa tu capacidad",
                 ChatColor.LIGHT_PURPLE+"de detectar jugadores enemigos cercanos",
+                ChatColor.LIGHT_PURPLE+"y te permite saber su vida al atacarles",
                 ChatColor.LIGHT_PURPLE+"de manera permanente."
         ));
         

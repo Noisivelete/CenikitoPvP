@@ -35,3 +35,6 @@ commands:
         description: Activa una mercyRule para un usuario
         usage: /<command>
         permission: cenikitopvp.mercyRule.switch
+    mostrarvida:
+        description: Cambia si se mostrará la vida de enemigos al atacarlos
+        usage: /<command>
